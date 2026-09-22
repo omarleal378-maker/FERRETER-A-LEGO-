@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FERRETERÍA LEGO</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f4f6f8;color:#222}
+header{background:#e63946;color:white;padding:18px 24px;display:flex;justify-content:space-between;align-items:center}
+header h1{margin:0;font-size:24px}
+header span{font-size:14px}
+nav{background:#20252b;padding:10px;display:flex;gap:8px;flex-wrap:wrap}
+nav button{border:0;background:#343a40;color:white;padding:10px 14px;border-radius:6px;cursor:pointer}
+nav button:hover{background:#495057}
+main{max-width:1100px;margin:24px auto;padding:0 16px}
+.section{display:none}.section.active{display:block}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:15px;margin-bottom:22px}
+.card{background:white;border-radius:10px;padding:18px;box-shadow:0 2px 8px #0001}
+.card h3{margin:0 0 8px;font-size:14px;color:#666}.number{font-size:28px;font-weight:bold}
+.panel{background:white;padding:20px;border-radius:10px;box-shadow:0 2px 8px #0001;margin-bottom:20px}
+input,select{padding:10px;border:1px solid #ccc;border-radius:6px;width:100%;margin:5px 0 12px}
+button.primary{background:#e63946;color:white;border:0;padding:10px 16px;border-radius:6px;cursor:pointer}
+button.delete{background:#6c757d;color:white;border:0;padding:7px 10px;border-radius:5px;cursor:pointer}
+table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid #eee;text-align:left}
+.low{color:#d00000;font-weight:bold}
+.formgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.empty{color:#777}
+@media(max-width:600px){header{display:block}header span{display:block;margin-top:6px}table{font-size:13px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>🔧 FERRETERÍA LEGO</h1>
+  <span>Sistema de administración</span>
+</header>
+
+<nav>
+  <button onclick="show('inicio')">📊 Inicio</button>
+  <button onclick="show('productos')">📦 Productos</button>
+  <button onclick="show('ventas')">🧾 Ventas</button>
+  <button onclick="show('inventario')">📋 Inventario</button>
+</nav>
+
+<main>
+<section id="inicio" class="section active">
+  <h2>Inicio</h2>
+  <div class="cards">
+    <div class="card"><h3>Productos registrados</h3><div class="number" id="totalProducts">0</div></div>
+    <div class="card"><h3>Existencias</h3><div class="number" id="totalStock">0</div></div>
+    <div class="card"><h3>Ventas registradas</h3><div class="number" id="totalSales">0</div></div>
+    <div class="card"><h3>Ventas del día</h3><div class="number" id="todaySales">$0.00</div></div>
+  </div>
+  <div class="panel">
+    <h3>⚠️ Poco inventario</h3>
+    <div id="lowStock"></div>
+  </div>
+</section>
+
+<section id="productos" class="section">
+  <h2>Productos</h2>
+  <div class="panel">
+    <h3>Agregar producto</h3>
+    <div class="formgrid">
+      <div><label>Nombre</label><input id="pName" placeholder="Ej. Martillo"></div>
+      <div><label>Categoría</label><input id="pCat" placeholder="Ej. Herramientas"></div>
+      <div><label>Precio de venta</label><input id="pPrice" type="number" min="0" step="0.01" placeholder="0.00"></div>
+      <div><label>Existencias</label><input id="pStock" type="number" min="0" step="1" placeholder="0"></div>
+    </div>
+    <button class="primary" onclick="addProduct()">+ Guardar producto</button>
+  </div>
+  <div class="panel">
+    <input id="search" placeholder="🔎 Buscar producto..." oninput="renderProducts()">
+    <div style="overflow-x:auto">
+      <table><thead><tr><th>Producto</th><th>Categoría</th><th>Precio</th><th>Existencias</th><th></th></tr></thead>
+      <tbody id="productTable"></tbody></table>
+    </div>
+  </div>
+</section>
+
+<section id="ventas" class="section">
+  <h2>Ventas</h2>
+  <div class="panel">
+    <h3>Registrar venta</h3>
+    <label>Producto</label><select id="saleProduct"></select>
+    <label>Cantidad</label><input id="saleQty" type="number" min="1" value="1">
+    <button class="primary" onclick="addSale()">Registrar venta</button>
+    <p id="saleMessage"></p>
+  </div>
+  <div class="panel">
+    <h3>Historial</h3>
+    <div style="overflow-x:auto"><table><thead><tr><th>Fecha</th><th>Producto</th><th>Cantidad</th><th>Total</th></tr></thead>
+    <tbody id="salesTable"></tbody></table></div>
+  </div>
+</section>
+
+<section id="inventario" class="section">
+  <h2>Inventario</h2>
+  <div class="panel">
+    <p>Las existencias se actualizan automáticamente al registrar una venta.</p>
+    <div style="overflow-x:auto"><table><thead><tr><th>Producto</th><th>Categoría</th><th>Existencias</th><th>Estado</th></tr></thead>
+    <tbody id="inventoryTable"></tbody></table></div>
+  </div>
+</section>
+</main>
+
+<script>
+let products = JSON.parse(localStorage.getItem('lego_products') || '[]');
+let sales = JSON.parse(localStorage.getItem('lego_sales') || '[]');
+
+function save(){
+  localStorage.setItem('lego_products', JSON.stringify(products));
+  localStorage.setItem('lego_sales', JSON.stringify(sales));
+  renderAll();
+}
+function show(id){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  renderAll();
+}
+function addProduct(){
+  const name=document.getElementById('pName').value.trim();
+  const cat=document.getElementById('pCat').value.trim() || 'Sin categoría';
+  const price=Number(document.getElementById('pPrice').value);
+  const stock=Number(document.getElementById('pStock').value);
+  if(!name || price<0 || stock<0){alert('Completa correctamente los datos.');return}
+  products.push({id:Date.now(),name,cat,price,stock});
+  ['pName','pCat','pPrice','pStock'].forEach(id=>document.getElementById(id).value='');
+  save();
+}
+function deleteProduct(id){
+  if(confirm('¿Eliminar este producto?')){products=products.filter(p=>p.id!==id);save();}
+}
+function addSale(){
+  const id=Number(document.getElementById('saleProduct').value);
+  const qty=Number(document.getElementById('saleQty').value);
+  const p=products.find(x=>x.id===id);
+  if(!p || qty<1){return}
+  if(qty>p.stock){document.getElementById('saleMessage').textContent='No hay suficientes existencias.';return}
+  p.stock-=qty;
+  sales.push({date:new Date().toLocaleString('es-MX'),name:p.name,qty,total:p.price*qty,day:new Date().toDateString()});
+  document.getElementById('saleMessage').textContent='Venta registrada correctamente.';
+  save();
+}
+function renderProducts(){
+  const q=(document.getElementById('search')?.value||'').toLowerCase();
+  const rows=products.filter(p=>(p.name+' '+p.cat).toLowerCase().includes(q)).map(p=>`
+    <tr><td>${esc(p.name)}</td><td>${esc(p.cat)}</td><td>$${p.price.toFixed(2)}</td>
+    <td class="${p.stock<=5?'low':''}">${p.stock}</td><td><button class="delete" onclick="deleteProduct(${p.id})">Eliminar</button></td></tr>`).join('');
+  document.getElementById('productTable').innerHTML=rows||'<tr><td colspan="5" class="empty">No hay productos registrados.</td></tr>';
+}
+function renderSales(){
+  document.getElementById('saleProduct').innerHTML=products.map(p=>`<option value="${p.id}">${esc(p.name)} — $${p.price.toFixed(2)} (${p.stock} disponibles)</option>`).join('')||'<option>No hay productos</option>';
+  document.getElementById('salesTable').innerHTML=sales.slice().reverse().map(s=>`<tr><td>${s.date}</td><td>${esc(s.name)}</td><td>${s.qty}</td><td>$${s.total.toFixed(2)}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">No hay ventas registradas.</td></tr>';
+}
+function renderInventory(){
+  document.getElementById('inventoryTable').innerHTML=products.map(p=>`<tr><td>${esc(p.name)}</td><td>${esc(p.cat)}</td><td>${p.stock}</td><td>${p.stock<=5?'<span class="low">Poco inventario</span>':'Disponible'}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">No hay productos.</td></tr>';
+}
+function renderAll(){
+  document.getElementById('totalProducts').textContent=products.length;
+  document.getElementById('totalStock').textContent=products.reduce((a,p)=>a+p.stock,0);
+  document.getElementById('totalSales').textContent=sales.length;
+  const today=new Date().toDateString();
+  const total=sales.filter(s=>s.day===today).reduce((a,s)=>a+s.total,0);
+  document.getElementById('todaySales').textContent='$'+total.toFixed(2);
+  document.getElementById('lowStock').innerHTML=products.filter(p=>p.stock<=5).map(p=>`<p>⚠️ ${esc(p.name)}: <b>${p.stock}</b> piezas</p>`).join('') || '<p class="empty">No hay productos con poco inventario.</p>';
+  renderProducts();renderSales();renderInventory();
+}
+function esc(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
+renderAll();
+</script>
+</body>
+</html>
